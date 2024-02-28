@@ -4,17 +4,19 @@ go 1.21.6
 
 require (
 	github.com/go-git/go-git/v5 v5.11.0
-	github.com/launchrctl/launchr v0.5.7
+	github.com/launchrctl/keyring v0.1.1
+	github.com/launchrctl/launchr v0.6.0
 	github.com/spf13/cobra v1.8.0
 )
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
+	filippo.io/age v1.1.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371 // indirect
 	github.com/a8m/envsubst v1.4.2 // indirect
-	github.com/cloudflare/circl v1.3.3 // indirect
+	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/containerd/containerd v1.7.12 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
