@@ -8,12 +8,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"syscall"
 
+	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
 	"github.com/launchrctl/launchr/pkg/log"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 func init() {
@@ -21,7 +20,9 @@ func init() {
 }
 
 // Plugin is launchr plugin providing bump action.
-type Plugin struct{}
+type Plugin struct {
+	k keyring.Keyring
+}
 
 // PluginInfo implements launchr.Plugin interface.
 func (p *Plugin) PluginInfo() launchr.PluginInfo {
@@ -29,15 +30,13 @@ func (p *Plugin) PluginInfo() launchr.PluginInfo {
 }
 
 // OnAppInit implements launchr.Plugin interface.
-func (p *Plugin) OnAppInit(_ launchr.App) error {
+func (p *Plugin) OnAppInit(app launchr.App) error {
+	app.GetService(&p.k)
 	return nil
 }
 
 // CobraAddCommands implements launchr.CobraPlugin interface to provide bump functionality.
 func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
-	var username string
-	var password string
-
 	var pblCmd = &cobra.Command{
 		Use:   "publish",
 		Short: "Upload local artifact archive to private repository",
@@ -45,36 +44,15 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
-			return publish(username, password)
+			return publish(p.k)
 		},
 	}
 
-	pblCmd.Flags().StringVarP(&username, "username", "", "", "Username")
-	pblCmd.Flags().StringVarP(&password, "password", "", "", "Password")
 	rootCmd.AddCommand(pblCmd)
 	return nil
 }
 
-func publish(username, password string) error {
-	// If username or password is empty, prompt the user to enter them
-	if username == "" {
-		fmt.Print("Artifacts repository username: ")
-		_, err := fmt.Scanln(&username)
-		if err != nil {
-			return err
-		}
-	}
-
-	if password == "" {
-		fmt.Print("Artifacts repository password: ")
-		passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
-		if err != nil {
-			return err
-		}
-		password = string(passwordBytes)
-		fmt.Println()
-	}
-
+func publish(k keyring.Keyring) error {
 	// Get repository information
 	repoName, lastCommitShortSHA, err := getRepoInfo()
 	if err != nil {
@@ -113,10 +91,7 @@ func publish(username, password string) error {
 		return fmt.Errorf("artifact %s not found in %s. Execute 'plasmactl platform:package' before", archiveFile, artifactDir)
 	}
 
-	// Logic
 	fmt.Printf("Looking for artifact %s in %s\n", archiveFile, artifactDir)
-	fmt.Printf("Publishing artifact %s/%s to %s...\n", artifactDir, archiveFile, artifactArchiveURL)
-
 	file, err := os.Open(path.Clean(artifactPath))
 	if err != nil {
 		log.Debug("%s", err)
@@ -130,8 +105,15 @@ func publish(username, password string) error {
 		log.Debug("%s", err)
 		return errors.New("error creating HTTP request")
 	}
-	req.SetBasicAuth(username, password)
 
+	fmt.Println("Getting credentials")
+	ci, err := getCredentials(artifactsRepositoryDomain, k)
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(ci.Username, ci.Password)
+
+	fmt.Printf("Publishing artifact %s/%s to %s...\n", artifactDir, archiveFile, artifactArchiveURL)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Debug("%s", err)
@@ -146,4 +128,30 @@ func publish(username, password string) error {
 	fmt.Println("Artifact successfully uploaded")
 
 	return nil
+}
+
+func getCredentials(url string, k keyring.Keyring) (keyring.CredentialsItem, error) {
+	ci, err := k.GetForURL(url)
+	if err != nil {
+		ci = keyring.CredentialsItem{}
+		ci.URL = url
+		if ci.URL != "" {
+			fmt.Printf("Please add login and password for URL - %s\n", ci.URL)
+		}
+		err = keyring.RequestCredentialsFromTty(&ci)
+		if err != nil {
+			return ci, err
+		}
+
+		err = k.AddItem(ci)
+		if err != nil {
+			return ci, err
+		}
+		err = k.Save()
+		if err != nil {
+			return ci, err
+		}
+	}
+
+	return ci, nil
 }
