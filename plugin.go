@@ -9,6 +9,8 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/launchrctl/launchr/pkg/cli"
+
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
 	"github.com/launchrctl/launchr/pkg/log"
@@ -91,7 +93,7 @@ func publish(k keyring.Keyring) error {
 		return fmt.Errorf("artifact %s not found in %s. Execute 'plasmactl platform:package' before", archiveFile, artifactDir)
 	}
 
-	fmt.Printf("Looking for artifact %s in %s\n", archiveFile, artifactDir)
+	cli.Println("Looking for artifact %s in %s", archiveFile, artifactDir)
 	file, err := os.Open(path.Clean(artifactPath))
 	if err != nil {
 		log.Debug("%s", err)
@@ -106,14 +108,14 @@ func publish(k keyring.Keyring) error {
 		return errors.New("error creating HTTP request")
 	}
 
-	fmt.Println("Getting credentials")
-	ci, err := getCredentials(artifactsRepositoryDomain, k)
+	cli.Println("Getting credentials")
+	ci, save, err := getCredentials(artifactsRepositoryDomain, k)
 	if err != nil {
 		return err
 	}
 	req.SetBasicAuth(ci.Username, ci.Password)
 
-	fmt.Printf("Publishing artifact %s/%s to %s...\n", artifactDir, archiveFile, artifactArchiveURL)
+	cli.Println("Publishing artifact %s/%s to %s...", artifactDir, archiveFile, artifactArchiveURL)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Debug("%s", err)
@@ -125,33 +127,47 @@ func publish(k keyring.Keyring) error {
 		return fmt.Errorf("failed to upload artifact: %s", resp.Status)
 	}
 
-	fmt.Println("Artifact successfully uploaded")
+	cli.Println("Artifact successfully uploaded")
+
+	defer func() {
+		if save {
+			err = k.Save()
+			if err != nil {
+				log.Err("Error during saving keyring file", err)
+			}
+		}
+	}()
 
 	return nil
 }
 
-func getCredentials(url string, k keyring.Keyring) (keyring.CredentialsItem, error) {
+func getCredentials(url string, k keyring.Keyring) (keyring.CredentialsItem, bool, error) {
 	ci, err := k.GetForURL(url)
+	save := false
 	if err != nil {
+		if errors.Is(err, keyring.ErrEmptyPass) {
+			return ci, false, err
+		} else if !errors.Is(err, keyring.ErrNotFound) {
+			log.Debug("%s", err)
+			return ci, false, errors.New("the keyring is malformed or wrong passphrase provided")
+		}
 		ci = keyring.CredentialsItem{}
 		ci.URL = url
 		if ci.URL != "" {
-			fmt.Printf("Please add login and password for URL - %s\n", ci.URL)
+			cli.Println("Please add login and password for URL - %s", ci.URL)
 		}
 		err = keyring.RequestCredentialsFromTty(&ci)
 		if err != nil {
-			return ci, err
+			return ci, false, err
 		}
 
 		err = k.AddItem(ci)
 		if err != nil {
-			return ci, err
+			return ci, false, err
 		}
-		err = k.Save()
-		if err != nil {
-			return ci, err
-		}
+
+		save = true
 	}
 
-	return ci, nil
+	return ci, save, nil
 }
