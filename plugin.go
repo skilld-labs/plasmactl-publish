@@ -28,7 +28,9 @@ type Plugin struct {
 
 // PluginInfo implements launchr.Plugin interface.
 func (p *Plugin) PluginInfo() launchr.PluginInfo {
-	return launchr.PluginInfo{}
+	return launchr.PluginInfo{
+		Weight: 10,
+	}
 }
 
 // OnAppInit implements launchr.Plugin interface.
