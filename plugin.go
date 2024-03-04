@@ -41,6 +41,9 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 
 // CobraAddCommands implements launchr.CobraPlugin interface to provide bump functionality.
 func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
+	var username string
+	var password string
+
 	var pblCmd = &cobra.Command{
 		Use:   "publish",
 		Short: "Upload local artifact archive to private repository",
@@ -48,15 +51,18 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
-			return publish(p.k)
+			return publish(username, password, p.k)
 		},
 	}
+
+	pblCmd.Flags().StringVarP(&username, "username", "", "", "Username for artifact repository")
+	pblCmd.Flags().StringVarP(&password, "password", "", "", "Password for artifact repository")
 
 	rootCmd.AddCommand(pblCmd)
 	return nil
 }
 
-func publish(k keyring.Keyring) error {
+func publish(username, password string, k keyring.Keyring) error {
 	// Get repository information
 	repoName, lastCommitShortSHA, err := getRepoInfo()
 	if err != nil {
@@ -111,7 +117,7 @@ func publish(k keyring.Keyring) error {
 	}
 
 	cli.Println("Getting credentials")
-	ci, save, err := getCredentials(artifactsRepositoryDomain, k)
+	ci, save, err := getCredentials(artifactsRepositoryDomain, username, password, k)
 	if err != nil {
 		return err
 	}
@@ -143,7 +149,7 @@ func publish(k keyring.Keyring) error {
 	return nil
 }
 
-func getCredentials(url string, k keyring.Keyring) (keyring.CredentialsItem, bool, error) {
+func getCredentials(url, username, password string, k keyring.Keyring) (keyring.CredentialsItem, bool, error) {
 	ci, err := k.GetForURL(url)
 	save := false
 	if err != nil {
@@ -155,7 +161,9 @@ func getCredentials(url string, k keyring.Keyring) (keyring.CredentialsItem, boo
 		}
 		ci = keyring.CredentialsItem{}
 		ci.URL = url
-		if ci.URL != "" {
+		ci.Username = username
+		ci.Password = password
+		if ci.URL != "" && (ci.Username == "" || ci.Password == "") {
 			cli.Println("Please add login and password for URL - %s", ci.URL)
 		}
 		err = keyring.RequestCredentialsFromTty(&ci)
