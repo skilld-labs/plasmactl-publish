@@ -163,12 +163,14 @@ func getCredentials(url, username, password string, k keyring.Keyring) (keyring.
 		ci.URL = url
 		ci.Username = username
 		ci.Password = password
-		if ci.URL != "" && (ci.Username == "" || ci.Password == "") {
-			cli.Println("Please add login and password for URL - %s", ci.URL)
-		}
-		err = keyring.RequestCredentialsFromTty(&ci)
-		if err != nil {
-			return ci, false, err
+		if ci.Username == "" || ci.Password == "" {
+			if ci.URL != "" {
+				cli.Println("Please add login and password for URL - %s", ci.URL)
+			}
+			err = keyring.RequestCredentialsFromTty(&ci)
+			if err != nil {
+				return ci, false, err
+			}
 		}
 
 		err = k.AddItem(ci)
