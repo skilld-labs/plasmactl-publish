@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/launchrctl/launchr/pkg/cli"
 
 	"github.com/launchrctl/keyring"
@@ -148,38 +149,54 @@ func publish(username, password string, k keyring.Keyring) error {
 
 	return nil
 }
-
 func getCredentials(url, username, password string, k keyring.Keyring) (keyring.CredentialsItem, bool, error) {
+	println("getCredentials 1")
+	spew.Dump(url)
+	spew.Dump(username)
+	spew.Dump(password)
+	spew.Dump(k)
 	ci, err := k.GetForURL(url)
+	spew.Dump(ci)
+	spew.Dump(err)
 	save := false
 	if err != nil {
+		println("getCredentials 2")
 		if errors.Is(err, keyring.ErrEmptyPass) {
+			println("getCredentials 3")
 			return ci, false, err
 		} else if !errors.Is(err, keyring.ErrNotFound) {
+			println("getCredentials 4")
 			log.Debug("%s", err)
 			return ci, false, errors.New("the keyring is malformed or wrong passphrase provided")
 		}
+		println("getCredentials 5")
 		ci = keyring.CredentialsItem{}
 		ci.URL = url
 		ci.Username = username
 		ci.Password = password
 		if ci.Username == "" || ci.Password == "" {
+			println("getCredentials 6")
 			if ci.URL != "" {
+				println("getCredentials 7")
 				cli.Println("Please add login and password for URL - %s", ci.URL)
 			}
 			err = keyring.RequestCredentialsFromTty(&ci)
 			if err != nil {
+				println("getCredentials 8")
 				return ci, false, err
 			}
 		}
+		println("getCredentials 9")
 
 		err = k.AddItem(ci)
 		if err != nil {
+			println("getCredentials 10")
 			return ci, false, err
 		}
 
 		save = true
 	}
+	println("getCredentials 11")
 
 	return ci, save, nil
 }

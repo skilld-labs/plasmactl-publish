@@ -3,6 +3,7 @@ module github.com/skilld-labs/plasmactl-publish
 go 1.21.6
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/launchrctl/keyring v0.1.1
 	github.com/launchrctl/launchr v0.6.0
