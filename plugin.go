@@ -110,29 +110,41 @@ func publish(username, password string, k keyring.Keyring) error {
 	defer file.Close()
 
 	client := &http.Client{}
-	req, err := http.NewRequest("PUT", artifactArchiveURL, file)
-	if err != nil {
-		log.Debug("%s", err)
-		return errors.New("error creating HTTP request")
-	}
 
 	cli.Println("Getting credentials")
 	ci, save, err := getCredentials(artifactsRepositoryDomain, username, password, k)
 	if err != nil {
 		return err
 	}
-	req.SetBasicAuth(ci.Username, ci.Password)
+
+	authRequest, err := http.NewRequest(http.MethodHead, artifactsRepositoryDomain, http.NoBody)
+	if err != nil {
+		log.Debug("%s", err)
+		return errors.New("error creating HTTP request")
+	}
+
+	authRequest.SetBasicAuth(ci.Username, ci.Password)
+	respAuth, err := client.Do(authRequest)
+	if respAuth.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to upload artifact: %s", respAuth.Status)
+	}
+
+	uploadRequest, err := http.NewRequest("PUT", artifactArchiveURL, file)
+	if err != nil {
+		return err
+	}
+	uploadRequest.SetBasicAuth(ci.Username, ci.Password)
 
 	cli.Println("Publishing artifact %s/%s to %s...", artifactDir, archiveFile, artifactArchiveURL)
-	resp, err := client.Do(req)
+	respUpload, err := client.Do(uploadRequest)
 	if err != nil {
 		log.Debug("%s", err)
 		return errors.New("error uploading artifact")
 	}
-	defer resp.Body.Close()
+	defer respUpload.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("failed to upload artifact: %s", resp.Status)
+	if respUpload.StatusCode != http.StatusOK && respUpload.StatusCode != http.StatusCreated {
+		return fmt.Errorf("failed to upload artifact: %s", respUpload.Status)
 	}
 
 	cli.Println("Artifact successfully uploaded")
