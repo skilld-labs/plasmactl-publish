@@ -98,7 +98,7 @@ func publish(username, password string, k keyring.Keyring) error {
 
 	// Check if artifact file exists
 	if _, err = os.Stat(artifactPath); os.IsNotExist(err) {
-		return fmt.Errorf("artifact %s not found in %s. Execute 'plasmactl platform:package' before", archiveFile, artifactDir)
+		return fmt.Errorf("artifact %s not found in %s. Execute 'plasmactl package' before", archiveFile, artifactDir)
 	}
 
 	cli.Println("Looking for artifact %s in %s", archiveFile, artifactDir)
