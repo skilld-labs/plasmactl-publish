@@ -7,9 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/launchrctl/launchr/pkg/cli"
-
 	"github.com/go-git/go-git/v5"
+	"github.com/launchrctl/launchr"
 )
 
 func getRepoInfo() (repoName, lastCommitShortSHA string, err error) {
@@ -43,7 +42,7 @@ func listFiles(dir string) error {
 	if err != nil {
 		return err
 	}
-	cli.Println("Listing files in %s:", dir)
+	launchr.Term().Printfln("Listing files in %s:", dir)
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -54,7 +53,7 @@ func listFiles(dir string) error {
 			return err
 		}
 		size := humanReadableSize(info.Size())
-		cli.Println("%s %10s %s %s", info.Mode(), size, info.ModTime().Format(time.Stamp), file.Name())
+		launchr.Term().Printfln("%s %10s %s %s", info.Mode(), size, info.ModTime().Format(time.Stamp), file.Name())
 	}
 
 	return nil
