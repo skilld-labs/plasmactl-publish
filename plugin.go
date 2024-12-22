@@ -2,6 +2,8 @@
 package plasmactlpublish
 
 import (
+	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,8 +12,13 @@ import (
 	"path/filepath"
 
 	"github.com/launchrctl/keyring"
+
 	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 )
+
+//go:embed action.yaml
+var actionYaml []byte
 
 func init() {
 	launchr.RegisterPlugin(&Plugin{})
@@ -35,27 +42,16 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 	return nil
 }
 
-// CobraAddCommands implements [launchr.CobraPlugin] interface to provide bump functionality.
-func (p *Plugin) CobraAddCommands(rootCmd *launchr.Command) error {
-	var username string
-	var password string
-
-	var pblCmd = &launchr.Command{
-		Use:   "publish",
-		Short: "Upload local artifact archive to private repository",
-		RunE: func(cmd *launchr.Command, _ []string) error {
-			// Don't show usage help on a runtime error.
-			cmd.SilenceUsage = true
-
-			return publish(username, password, p.k)
-		},
-	}
-
-	pblCmd.Flags().StringVarP(&username, "username", "", "", "Username for artifact repository")
-	pblCmd.Flags().StringVarP(&password, "password", "", "", "Password for artifact repository")
-
-	rootCmd.AddCommand(pblCmd)
-	return nil
+// DiscoverActions implements [launchr.ActionDiscoveryPlugin] interface.
+func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
+	a := action.NewFromYAML("publish", actionYaml)
+	a.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
+		input := a.Input()
+		username := input.Opt("username").(string)
+		password := input.Opt("password").(string)
+		return publish(username, password, p.k)
+	}))
+	return []*action.Action{a}, nil
 }
 
 func publish(username, password string, k keyring.Keyring) error {
